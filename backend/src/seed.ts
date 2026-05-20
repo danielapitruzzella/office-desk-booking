@@ -1,5 +1,5 @@
 import { db } from "./db/client";
-import { offices, floors, desks, bookings } from "./db/schema";
+import { offices, floors, desks, bookings, meetingRooms, roomBookings } from "./db/schema";
 
 // ─── SVG helpers ───────────────────────────────────────────────────────────
 
@@ -60,6 +60,12 @@ function buildRomeSvg() {
   <!-- Floor boundary -->
   <rect x="20" y="20" width="1160" height="860" rx="6" fill="#fafafa" stroke="#888" stroke-width="3"/>
 
+  <!-- Entrance: gap in top wall, centred at x=600 -->
+  <rect x="530" y="17" width="140" height="9" fill="#fafafa"/>
+  <rect x="522" y="14" width="10" height="13" rx="2" fill="#888"/>
+  <rect x="668" y="14" width="10" height="13" rx="2" fill="#888"/>
+  <text x="600" y="12" text-anchor="middle" font-size="11" fill="#aaa" font-family="sans-serif" font-weight="700" letter-spacing="2">ENTRANCE</text>
+
   <!-- Zone A background – top-left -->
   <rect x="42" y="98" width="196" height="260" rx="6" fill="#ede9fe" stroke="#c4b5fd" stroke-width="1.5"/>
   <text x="140" y="90" text-anchor="middle" font-size="11" fill="#7c3aed" font-family="sans-serif" font-weight="700" letter-spacing="1">ZONE A</text>
@@ -98,17 +104,7 @@ function buildRomeSvg() {
   <rect x="413" y="687" width="7" height="193" fill="#888"/>
   <rect x="780" y="687" width="7" height="193" fill="#888"/>
 
-  <!-- Meeting room fills -->
-  <rect x="27"  y="687" width="386" height="193" fill="#eef2ff"/>
-  <rect x="420" y="687" width="360" height="193" fill="#eef2ff"/>
-  <rect x="787" y="687" width="393" height="193" fill="#eef2ff"/>
-
-  <!-- Meeting room labels -->
-  <text x="220"  y="722" text-anchor="middle" font-size="13" fill="#3730a3" font-family="sans-serif" font-weight="700">Meeting Room 1</text>
-  <text x="600"  y="722" text-anchor="middle" font-size="13" fill="#3730a3" font-family="sans-serif" font-weight="700">Meeting Room 2</text>
-  <text x="983"  y="722" text-anchor="middle" font-size="13" fill="#3730a3" font-family="sans-serif" font-weight="700">Meeting Room 3</text>
-
-  <!-- Conference tables -->
+  <!-- Conference tables (meeting room overlays rendered by React on top) -->
   <ellipse cx="220"  cy="810" rx="85" ry="38" fill="#c7d2fe" stroke="#818cf8" stroke-width="2"/>
   <ellipse cx="600"  cy="810" rx="85" ry="38" fill="#c7d2fe" stroke="#818cf8" stroke-width="2"/>
   <ellipse cx="983"  cy="810" rx="85" ry="38" fill="#c7d2fe" stroke="#818cf8" stroke-width="2"/>
@@ -164,6 +160,8 @@ function buildMilanFloorSvg(floorLabel: string) {
 
 async function seed() {
   console.log("Wiping existing data...");
+  await db.delete(roomBookings);
+  await db.delete(meetingRooms);
   await db.delete(bookings);
   await db.delete(desks);
   await db.delete(floors);
@@ -247,8 +245,21 @@ async function seed() {
     { floorId: milanF2.id, label: "M2-06", x: 340, y: 260, width: milanDeskW, height: milanDeskH },
   ]);
 
+  // ── Meeting rooms ──────────────────────────────────────────────────────
+  // Positions match the background SVG walls exactly:
+  //   MR1: x=20 to x=413  →  w=393
+  //   MR2: x=420 to x=780 →  w=360
+  //   MR3: x=787 to x=1180→  w=393
+  //   All: y=687, h=193
+  console.log("Inserting meeting rooms...");
+  await db.insert(meetingRooms).values([
+    { floorId: romeFloor.id, name: "Meeting Room 1", capacity: 8,  x: 20,  y: 687, width: 393, height: 193 },
+    { floorId: romeFloor.id, name: "Meeting Room 2", capacity: 6,  x: 420, y: 687, width: 360, height: 193 },
+    { floorId: romeFloor.id, name: "Meeting Room 3", capacity: 10, x: 787, y: 687, width: 393, height: 193 },
+  ]);
+
   console.log("Seed complete.");
-  console.log(`  Rome:  1 floor, 12 desks (zones A–D)`);
+  console.log(`  Rome:  1 floor, 12 desks (zones A–D), 3 meeting rooms`);
   console.log(`  Milan: 2 floors, 8 + 6 desks`);
 }
 

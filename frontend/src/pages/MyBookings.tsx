@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { api } from "../api/client";
 import { useUser } from "../context/UserContext";
-import type { MyBooking } from "../types/api";
+import type { MyBooking, MyRoomBooking } from "../types/api";
 
 function todayIso() {
   return new Date().toISOString().split("T")[0];
@@ -58,6 +58,7 @@ export default function MyBookings() {
   const { user } = useUser();
   const navigate = useNavigate();
   const [bookings, setBookings] = useState<MyBooking[]>([]);
+  const [roomBookings, setRoomBookings] = useState<MyRoomBooking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -66,13 +67,22 @@ export default function MyBookings() {
   const load = useCallback(() => {
     if (!user) return;
     setLoading(true);
-    api.bookings
-      .mine(user.email)
-      .then((rows) => { setBookings(rows); setLoading(false); })
+    Promise.all([api.bookings.mine(user.email), api.roomBookings.mine(user.email)])
+      .then(([db, rb]) => { setBookings(db); setRoomBookings(rb); setLoading(false); })
       .catch(() => { setError("Failed to load bookings"); setLoading(false); });
   }, [user]);
 
   useEffect(() => { load(); }, [load]);
+
+  const handleCancelRoom = async (rb: MyRoomBooking) => {
+    if (!user) return;
+    try {
+      await api.roomBookings.delete(rb.id, user.email);
+      setRoomBookings((prev) => prev.filter((x) => x.id !== rb.id));
+    } catch {
+      setError("Failed to cancel room booking.");
+    }
+  };
 
   const handleCancelOne = async (b: MyBooking) => {
     if (!user) return;
@@ -100,11 +110,12 @@ export default function MyBookings() {
   return (
     <div style={styles.page}>
       <h1 style={styles.title}>My Bookings</h1>
+      {/* Tab-like heading separator */}
       {error && <p style={styles.error}>{error}</p>}
 
       {loading ? (
         <p style={styles.muted}>Loading…</p>
-      ) : bookings.length === 0 ? (
+      ) : bookings.length === 0 && roomBookings.length === 0 ? (
         <div style={styles.emptyState}>
           <p style={styles.muted}>You have no bookings yet.</p>
           <button style={styles.ctaBtn} onClick={() => navigate("/")}>Book a desk</button>
@@ -163,6 +174,52 @@ export default function MyBookings() {
                     />
                   )
                 )}
+              </div>
+            </section>
+          )}
+
+          {/* ── Room bookings ── */}
+          {roomBookings.length > 0 && (
+            <section style={{ ...styles.section, marginTop: upcoming.length > 0 || past.length > 0 ? 40 : 0 }}>
+              <h2 style={{ ...styles.sectionTitle, color: "#0369a1" }}>Meeting Room Bookings</h2>
+              <div style={styles.list}>
+                {roomBookings.map((rb) => {
+                  const isPast = rb.date < today;
+                  return (
+                    <div key={rb.id} style={{ ...styles.card, opacity: isPast ? 0.6 : 1 }}>
+                      <div style={styles.cardLeft}>
+                        <div style={styles.dateLabel}>{fmtDate(rb.date)}</div>
+                        <div style={styles.locationLine}>
+                          <span style={styles.officeName}>{rb.officeName}</span>
+                          <span style={styles.sep}>·</span>
+                          <span>{rb.floorName}</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+                          <span style={{ ...styles.deskChip, background: "#e0f2fe", color: "#0369a1" }}>
+                            {rb.roomName}
+                          </span>
+                          <span style={{ fontSize: 12, color: "#555", fontWeight: 600 }}>
+                            {String(rb.startHour).padStart(2,"0")}:00 – {String(rb.endHour).padStart(2,"0")}:00
+                          </span>
+                          {rb.title && <span style={{ fontSize: 12, color: "#888" }}>"{rb.title}"</span>}
+                        </div>
+                      </div>
+                      {!isPast && (
+                        <div style={styles.cardActions}>
+                          <button
+                            style={styles.viewBtn}
+                            onClick={() => navigate(`/offices/${rb.officeId}/floors/${rb.floorId}`)}
+                          >
+                            View floor
+                          </button>
+                          <button style={styles.cancelBtn} onClick={() => handleCancelRoom(rb)}>
+                            Cancel
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </section>
           )}

@@ -1,13 +1,17 @@
 import { useRef, useState, useCallback, useEffect } from "react";
-import type { Floor, Desk, Booking } from "../types/api";
+import type { Floor, Desk, Booking, MeetingRoom, RoomBooking } from "../types/api";
 import { useUser } from "../context/UserContext";
 import DeskOverlay from "./DeskOverlay";
+import MeetingRoomOverlay from "./MeetingRoomOverlay";
 
 interface Props {
   floor: Floor;
   desks: Desk[];
   bookings: Booking[];
   onDeskClick: (desk: Desk) => void;
+  meetingRooms?: MeetingRoom[];
+  roomBookings?: RoomBooking[];
+  onRoomClick?: (room: MeetingRoom) => void;
 }
 
 interface ZoomState {
@@ -16,7 +20,7 @@ interface ZoomState {
   ty: number;
 }
 
-export default function FloorMap({ floor, desks, bookings, onDeskClick }: Props) {
+export default function FloorMap({ floor, desks, bookings, onDeskClick, meetingRooms = [], roomBookings = [], onRoomClick }: Props) {
   const { user } = useUser();
   const [zoom, setZoom] = useState<ZoomState>({ scale: 1, tx: 0, ty: 0 });
   const dragRef = useRef<{ startX: number; startY: number; tx: number; ty: number } | null>(null);
@@ -86,6 +90,15 @@ export default function FloorMap({ floor, desks, bookings, onDeskClick }: Props)
                 booking={bookingsByDeskId.get(desk.id)}
                 currentUserEmail={user?.email ?? ""}
                 onClick={() => onDeskClick(desk)}
+              />
+            ))}
+            {meetingRooms.map((room) => (
+              <MeetingRoomOverlay
+                key={room.id}
+                room={room}
+                roomBookings={roomBookings.filter((b) => b.roomId === room.id)}
+                currentUserEmail={user?.email ?? ""}
+                onClick={() => onRoomClick?.(room)}
               />
             ))}
           </g>
