@@ -1,0 +1,1 @@
+ALTER TABLE `bookings` ADD `series_id` integer;
